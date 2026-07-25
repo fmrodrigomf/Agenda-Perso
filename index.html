@@ -261,6 +261,7 @@ a{color:inherit;}
 }
 #sidebarOverlay{display:none;position:fixed;inset:0;background:rgba(8,10,13,.55);z-index:39;}
 body.sidebar-open #sidebarOverlay{display:block;}
+body.sidebar-open #mobileMenuBtn{display:none;}
 
 @media (max-width:860px){
   #mobileMenuBtn{display:flex;}
@@ -286,19 +287,19 @@ body.sidebar-open #sidebarOverlay{display:block;}
     </div>
     <button id="quickAddBtn" onclick="openTaskModal()">+ Nouvelle tâche</button>
     <div class="side-scroll">
-      <div class="side-section">
-        <h3>En retard <span class="count" id="cntOverdue">0</span></h3>
+      <div class="side-section collapsed" id="secOverdue">
+        <h3 onclick="toggleSection('secOverdue')"><span class="h3-title">En retard <span class="chev">▾</span></span> <span class="count" id="cntOverdue">0</span></h3>
         <div id="listOverdue" class="section-body"></div>
       </div>
-      <div class="side-section" id="secToday">
+      <div class="side-section collapsed" id="secToday">
         <h3 onclick="toggleSection('secToday')"><span class="h3-title">Aujourd'hui <span class="chev">▾</span></span> <span class="count" id="cntToday">0</span></h3>
         <div id="listToday" class="section-body" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');onDropSection(event,'today')"></div>
       </div>
-      <div class="side-section" id="secUpcoming">
+      <div class="side-section collapsed" id="secUpcoming">
         <h3 onclick="toggleSection('secUpcoming')"><span class="h3-title">À venir <span class="chev">▾</span></span> <span class="count" id="cntUpcoming">0</span></h3>
         <div id="listUpcoming" class="section-body" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');onDropSection(event,'upcoming')"></div>
       </div>
-      <div class="side-section" id="secNoDate">
+      <div class="side-section collapsed" id="secNoDate">
         <h3 onclick="toggleSection('secNoDate')"><span class="h3-title">Sans date <span class="chev">▾</span></span> <span class="count" id="cntNoDate">0</span></h3>
         <div id="listNoDate" class="section-body" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');onDropSection(event,'nodate')"></div>
       </div>
@@ -632,6 +633,12 @@ function onDropDate(e, iso){
 function toggleSection(id){
   document.getElementById(id).classList.toggle('collapsed');
 }
+function collapseAllSections(){
+  ['secOverdue','secToday','secUpcoming','secNoDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.add('collapsed');
+  });
+}
 
 /* ============================= MODALS ============================= */
 function openModal(id){ document.getElementById(id).classList.add('open'); }
@@ -773,6 +780,11 @@ document.addEventListener('touchend', e => {
   if(now - lastTouchEnd <= 300) e.preventDefault();
   lastTouchEnd = now;
 }, false);
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') collapseAllSections();
+});
+window.addEventListener('pageshow', () => collapseAllSections());
 
 document.addEventListener('keydown', (e) => {
   if(e.key === 'Escape'){ closeModal('taskModalOverlay'); closeModal('dayModalOverlay'); closeModal('historyModalOverlay'); }
