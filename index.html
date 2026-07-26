@@ -111,6 +111,7 @@ a{color:inherit;}
 .task-mini.done .chk::after{content:'✓';color:#0d1a14;font-size:10.5px;font-weight:700;}
 .task-mini .tbody{flex:1;min-width:0;}
 .task-mini .ttext{font-size:13px;line-height:1.4;word-break:break-word;}
+.note-flag{font-size:10px;opacity:.7;}
 .task-mini.done .ttext{color:var(--text-faint);text-decoration:line-through;}
 .task-mini .tmeta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-top:2px;}
 .task-mini.overdue .tmeta{color:var(--danger);}
@@ -377,8 +378,12 @@ body.sidebar-open #mobileMenuBtn{display:none;}
     </div>
     <div class="modal-body">
       <div class="field">
-        <label>Description</label>
-        <textarea id="fText" rows="2" placeholder="Ce qu'il y a à faire…"></textarea>
+        <label>Titre</label>
+        <input type="text" id="fTitle" placeholder="Ex : Appeler le plombier">
+      </div>
+      <div class="field">
+        <label>Note (optionnel)</label>
+        <textarea id="fNote" rows="3" placeholder="Détails, contexte, liens…"></textarea>
       </div>
       <div class="field-row">
         <div class="field">
@@ -416,7 +421,16 @@ function loadTasks(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.tasks) ? parsed.tasks : [];
+    const list = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+    // migration : anciennes tâches stockées avec un seul champ "text"
+    list.forEach(t => {
+      if(t.title === undefined){
+        t.title = t.text || '';
+        t.note = t.note || '';
+        delete t.text;
+      }
+    });
+    return list;
   }catch(e){ return []; }
 }
 function saveTasks(){
@@ -577,11 +591,12 @@ function taskMiniHtml(t, opts){
   let meta = '';
   if(opts.showDate && t.date) meta = formatShortDate(parseISO(t.date)) + (t.time? ' · '+t.time : '');
   else if(t.time) meta = t.time;
+  const hasNote = t.note && t.note.trim().length > 0;
   return `
     <div class="task-mini ${t.done?'done':''} ${isOverdue(t)?'overdue':''}" draggable="true" ondragstart="onDragStart(event,'${t.id}')" onclick="if(event.target.className.indexOf('tdel')<0) openTaskModal(null,'${t.id}')">
       <div class="chk" onclick="event.stopPropagation();toggleTask('${t.id}')"></div>
       <div class="tbody">
-        <div class="ttext">${escapeHtml(t.text)}</div>
+        <div class="ttext">${escapeHtml(t.title)}${hasNote ? ' <span class="note-flag" title="A une note">📝</span>' : ''}</div>
         ${meta ? `<div class="tmeta">${meta}</div>` : ''}
       </div>
       <button class="tdel" onclick="event.stopPropagation();removeTask('${t.id}')">✕</button>
@@ -682,30 +697,33 @@ function openTaskModal(prefillDate, taskId){
 
   if(isEdit){
     const t = tasks.find(x=>x.id===taskId);
-    document.getElementById('fText').value = t.text;
+    document.getElementById('fTitle').value = t.title;
+    document.getElementById('fNote').value = t.note || '';
     document.getElementById('fDate').value = t.date || '';
     document.getElementById('fTime').value = t.time || '';
   } else {
-    document.getElementById('fText').value = '';
+    document.getElementById('fTitle').value = '';
+    document.getElementById('fNote').value = '';
     document.getElementById('fDate').value = prefillDate || '';
     document.getElementById('fTime').value = '';
   }
   closeModal('dayModalOverlay');
   openModal('taskModalOverlay');
-  setTimeout(()=>document.getElementById('fText').focus(), 50);
+  setTimeout(()=>document.getElementById('fTitle').focus(), 50);
 }
 
 function saveTaskFromModal(){
-  const text = document.getElementById('fText').value.trim();
+  const title = document.getElementById('fTitle').value.trim();
+  const note = document.getElementById('fNote').value.trim();
   const date = document.getElementById('fDate').value || null;
   const time = document.getElementById('fTime').value || null;
-  if(!text){ showToast('Ajoute une description'); return; }
+  if(!title){ showToast('Ajoute un titre'); return; }
 
   if(editingTaskId){
     const t = tasks.find(x=>x.id===editingTaskId);
-    t.text = text; t.date = date; t.time = time;
+    t.title = title; t.note = note; t.date = date; t.time = time;
   } else {
-    tasks.push({ id: uid(), text, date, time, done:false, createdAt: Date.now() });
+    tasks.push({ id: uid(), title, note, date, time, done:false, createdAt: Date.now() });
   }
   saveTasks();
   closeModal('taskModalOverlay');
@@ -749,6 +767,9 @@ async function importData(file){
     const text = await file.text();
     const payload = JSON.parse(text);
     if(!payload || !Array.isArray(payload.tasks)) throw new Error('format invalide');
+    payload.tasks.forEach(t => {
+      if(t.title === undefined){ t.title = t.text || ''; t.note = t.note || ''; delete t.text; }
+    });
     const merge = confirm(`Importer ${payload.tasks.length} tâche(s) ?\nOK = fusionner avec l'existant\nAnnuler = remplacer tout`);
     if(merge){
       const existingIds = new Set(tasks.map(t=>t.id));
